@@ -53,8 +53,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     @Override
     public CategoryDto updateCategory(Long catId, NewCategoryDto categoryDto) {
-        Category categoryToUpdate = categoryRepository.findById(catId)
-                .orElseThrow(() -> new NotFoundException("Категория с ID=" + catId + " не найдена."));
+        Category categoryToUpdate = findCategoryById(catId);
 
         String newName = categoryDto.getName();
 
@@ -82,8 +81,13 @@ public class CategoryServiceImpl implements CategoryService {
 
     @Override
     public CategoryDto getCategoryById(Long catId) {
-        Category category = categoryRepository.findById(catId)
-                .orElseThrow(() -> new NotFoundException("Категория с ID=" + catId + " не найдена."));
+        Category category = findCategoryById(catId);
         return CategoryMapper.toCategoryDto(category);
     }
+
+    private Category findCategoryById(Long catId) {
+        return categoryRepository.findById(catId)
+                .orElseThrow(() -> new NotFoundException("Категория с ID=" + catId + " не найдена."));
+    }
+
 }

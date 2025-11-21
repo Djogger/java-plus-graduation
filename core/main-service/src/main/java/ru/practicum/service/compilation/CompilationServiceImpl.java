@@ -65,8 +65,7 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     @Transactional
     public CompilationDto updateCompilation(Long compId, UpdateCompilationRequest updateRequest) {
-        Compilation compilation = compilationRepository.findById(compId)
-                .orElseThrow(() -> new NotFoundException("Подборка с ID=" + compId + " не найдена."));
+        Compilation compilation = findCompilationById(compId);
 
         if (updateRequest.getEvents() != null) {
             Set<Event> events = eventRepository.findAllByIdIn(updateRequest.getEvents());
@@ -115,8 +114,7 @@ public class CompilationServiceImpl implements CompilationService {
 
     @Override
     public CompilationDto getCompilationById(Long compId) {
-        Compilation compilation = compilationRepository.findById(compId)
-                .orElseThrow(() -> new NotFoundException("Подборка с ID=" + compId + " не найдена."));
+        Compilation compilation = findCompilationById(compId);
 
         Set<Long> eventIds = compilation.getEvents().stream()
                 .map(Event::getId)
@@ -125,4 +123,10 @@ public class CompilationServiceImpl implements CompilationService {
 
         return CompilationMapper.toCompilationDto(compilation, confirmedRequestsCounts);
     }
+
+    private Compilation findCompilationById(Long compId) {
+        return compilationRepository.findById(compId)
+                .orElseThrow(() -> new NotFoundException("Подборка с ID=" + compId + " не найдена."));
+    }
+
 }

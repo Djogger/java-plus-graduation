@@ -58,8 +58,7 @@ public class EventServiceImpl implements EventService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Пользователь с ID=" + userId + " не найден."));
-        Category category = categoryRepository.findById(newEventDto.getCategory())
-                .orElseThrow(() -> new NotFoundException("Категория с ID=" + newEventDto.getCategory() + " не найдена."));
+        Category category = findCategoryById(newEventDto.getCategory());
 
         Location location = getLocation(newEventDto.getLocation());
 
@@ -106,8 +105,7 @@ public class EventServiceImpl implements EventService {
         }
 
         if (dto.getCategory() != null) {
-            Category category = categoryRepository.findById(dto.getCategory())
-                    .orElseThrow(() -> new NotFoundException("Категория с ID=" + dto.getCategory() + " не найдена."));
+            Category category = findCategoryById(dto.getCategory());
             event.setCategory(category);
         }
 
@@ -149,8 +147,7 @@ public class EventServiceImpl implements EventService {
         }
 
         if (dto.getCategory() != null) {
-            Category category = categoryRepository.findById(dto.getCategory())
-                    .orElseThrow(() -> new NotFoundException("Категория с ID=" + dto.getCategory() + " не найдена."));
+            Category category = findCategoryById(dto.getCategory());
             event.setCategory(category);
         }
         if (dto.getLocation() != null) {
@@ -161,8 +158,7 @@ public class EventServiceImpl implements EventService {
     @Override
     @Transactional
     public EventFullDto updateEventByUser(Long userId, Long eventId, UpdateEventUserRequest updateRequest) {
-        Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
-                .orElseThrow(() -> new NotFoundException("Событие с ID=" + eventId + " и инициатором ID=" + userId + " не найдено."));
+        Event event = findEventByIdAndInitiatorId(eventId, userId);
 
         if (event.getState() == EventState.PUBLISHED) {
             throw new ConflictException("Нельзя изменить уже опубликованное событие.");
@@ -534,4 +530,10 @@ public class EventServiceImpl implements EventService {
 
         return predicates;
     }
+
+    private Category findCategoryById(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new NotFoundException("Категория с ID=" + categoryId + " не найдена."));
+    }
+
 }
