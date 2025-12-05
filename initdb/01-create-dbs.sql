@@ -1,0 +1,2 @@
+CREATE DATABASE "ewm-db";
+CREATE DATABASE "stats-db";
