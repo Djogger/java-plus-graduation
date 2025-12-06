@@ -1,5 +1,4 @@
 services:
-
   db:
     image: postgres:16.1
     container_name: explore-with-me-db
@@ -16,7 +15,11 @@ services:
       timeout: 5s
       interval: 5s
       retries: 10
-    profiles: [ "main" ]
+    networks:
+      - app-network
+    profiles:
+      - default
+      - docker
 
   discovery-server:
     image: discovery-server:latest
@@ -25,13 +28,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8761:8761"
-      - "5005:5005"
     depends_on:
       db:
         condition: service_healthy
     environment:
       JAVA_OPTS: >
-        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 
         -Duser.timezone=Europe/Moscow
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8761/actuator/health" ]
@@ -39,4 +40,180 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
-    profiles: ["main"]
+    networks:
+      - app-network
+    profiles:
+      - default
+      - docker
+
+  config-server:
+    image: config-server:latest
+    build:
+      context: ./infra/config-server
+      dockerfile: Dockerfile
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: >
+        -Duser.timezone=Europe/Moscow
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    networks:
+      - app-network
+    profiles:
+      - docker
+
+  event-service:
+    image: event-service:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    build:
+      context: ./core/event-service
+      dockerfile: Dockerfile
+    ports:
+      - "5005:5005"
+    depends_on:
+      db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_OPTS: >
+        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 
+        -Duser.timezone=Europe/Moscow
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    networks:
+      - app-network
+    profiles:
+      - docker
+
+  user-service:
+    image: user-service:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    build:
+      context: ./core/user-service
+      dockerfile: Dockerfile
+    ports:
+      - "5007:5005"
+    depends_on:
+      db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_OPTS: >
+        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 
+        -Duser.timezone=Europe/Moscow
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    networks:
+      - app-network
+    profiles:
+      - docker
+
+  request-service:
+    image: request-service:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    build:
+      context: ./core/request-service
+      dockerfile: Dockerfile
+    ports:
+      - "5008:5005"
+    depends_on:
+      db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_OPTS: >
+        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 
+        -Duser.timezone=Europe/Moscow
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    networks:
+      - app-network
+    profiles:
+      - docker
+
+  stats-server:
+    image: stats-server:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    build:
+      context: ./stats/stats-server
+      dockerfile: Dockerfile
+    ports:
+      - "5006:5005"
+    depends_on:
+      db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_OPTS: >
+        -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 
+        -Duser.timezone=Europe/Moscow
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    networks:
+      - app-network
+    profiles:
+      - docker
+
+  gateway-server:
+    image: gateway-server:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    build:
+      context: ./infra/gateway-server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      config-server:
+        condition: service_started
+    environment:
+      JAVA_OPTS: >
+        -Duser.timezone=Europe/Moscow
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+    networks:
+      - app-network
+    profiles:
+      - docker
+
+networks:
+  app-network:
+    driver: bridge

@@ -19,7 +19,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class StatsServiceImpl implements StatsService {
-
     private final StatsRepository statsRepository;
 
     @Override

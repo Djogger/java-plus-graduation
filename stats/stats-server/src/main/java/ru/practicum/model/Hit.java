@@ -33,7 +33,6 @@ public class Hit {
     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime timestamp;
 
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

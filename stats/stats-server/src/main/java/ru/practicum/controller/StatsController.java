@@ -25,7 +25,6 @@ import java.util.List;
 public class StatsController {
     private final StatsService statsService;
 
-
     /**
      * Создать запрос
      *
@@ -49,15 +48,14 @@ public class StatsController {
      * @return Collection<ViewStatsDto> список с результатом выборки
      */
     @GetMapping("/stats")
-    public ResponseEntity<List<ViewStatsDto>> getStats(@RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime start,
-                                                       @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime end,
-                                                       @RequestParam(required = false) List<String> uris,
-                                                       @RequestParam(defaultValue = "false") Boolean unique
+    public ResponseEntity<List<ViewStatsDto>> getStats(
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime start,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime end,
+            @RequestParam(required = false) List<String> uris,
+            @RequestParam(defaultValue = "false") Boolean unique
     ) {
         log.info("Получен запрос на статистику: start={}, end={}, uris={}, unique={}", start, end, uris, unique);
-
         List<ViewStatsDto> stats = statsService.getStats(start, end, uris, unique);
-
         return ResponseEntity.ok(stats);
     }
 }
