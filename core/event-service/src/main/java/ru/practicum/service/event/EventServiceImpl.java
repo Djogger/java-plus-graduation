@@ -2,19 +2,16 @@ package ru.practicum.service.event;
 
 import feign.FeignException;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.criteria.*;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.HitDto;
-import ru.practicum.StatsClient;
-import ru.practicum.ViewStatsDto;
 import ru.practicum.contract.ParticipationRequestClient;
 import ru.practicum.contract.UserClient;
 import ru.practicum.dto.event.*;
@@ -24,38 +21,38 @@ import ru.practicum.dto.request.EventRequestStatusUpdateResult;
 import ru.practicum.dto.request.ParticipationRequestDto;
 import ru.practicum.dto.user.UserDto;
 import ru.practicum.enums.*;
+import ru.practicum.ewm.stats.proto.RecommendedEventProto;
 import ru.practicum.exception.ConflictException;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.exception.ValidationException;
+import ru.practicum.ActionType;
+import ru.practicum.AnalyzerGrpcClient;
+import ru.practicum.CollectorGrpcClient;
 import ru.practicum.mapper.EventMapper;
 import ru.practicum.mapper.LocationMapper;
 import ru.practicum.model.Category;
 import ru.practicum.model.Event;
 import ru.practicum.model.Location;
-import ru.practicum.repository.*;
+import ru.practicum.repository.CategoryRepository;
+import ru.practicum.repository.EventRepository;
+import ru.practicum.repository.LocationRepository;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class EventServiceImpl implements EventService {
-    @Value("${app.name:ewm-main-service}")
-    private String appName;
-
     private final EventRepository eventRepository;
     private final UserClient userClient;
     private final CategoryRepository categoryRepository;
     private final LocationRepository locationRepository;
     private final ParticipationRequestClient participationRequestClient;
     private final EntityManager entityManager;
-    private final StatsClient statsClient;
-    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private final CollectorGrpcClient collectorGrpcClient;
+    private final AnalyzerGrpcClient analyzerGrpcClient;
 
     @Override
     @Transactional
@@ -63,7 +60,7 @@ public class EventServiceImpl implements EventService {
         validateEventDate(newEventDto.getEventDate(), 1);
 
         Optional<UserDto> userDto = findUserById(userId);
-        if (userDto.isEmpty()) new NotFoundException("Пользователь с ID=" + userId + " не найден.");
+        if (userDto.isEmpty()) throw new NotFoundException("Пользователь с ID=" + userId + " не найден.");
 
         Category category = findCategoryById(newEventDto.getCategory());
 
@@ -121,78 +118,54 @@ public class EventServiceImpl implements EventService {
     }
 
     private void updateEventFromAdminRequest(Event event, UpdateEventAdminRequest dto) {
-        if (dto.getAnnotation() != null) {
-            event.setAnnotation(dto.getAnnotation());
-        }
-        if (dto.getDescription() != null) {
-            event.setDescription(dto.getDescription());
-        }
+        if (dto.getAnnotation() != null) event.setAnnotation(dto.getAnnotation());
+        if (dto.getDescription() != null) event.setDescription(dto.getDescription());
+
         if (dto.getEventDate() != null) {
             validateEventDate(dto.getEventDate(), 1);
             event.setEventDate(dto.getEventDate());
         }
-        if (dto.getPaid() != null) {
-            event.setPaid(dto.getPaid());
-        }
-        if (dto.getTitle() != null) {
-            event.setTitle(dto.getTitle());
-        }
+
+        if (dto.getPaid() != null) event.setPaid(dto.getPaid());
+        if (dto.getTitle() != null) event.setTitle(dto.getTitle());
 
         if (dto.getCategory() != null) {
             Category category = findCategoryById(dto.getCategory());
             event.setCategory(category);
         }
 
-        if (dto.getLocation() != null) {
-            event.setLocation(getLocation(dto.getLocation()));
-        }
-
-        if (dto.getParticipantLimit() != null) {
-            event.setParticipantLimit(dto.getParticipantLimit());
-        }
-
-        if (dto.getRequestModeration() != null) {
-            event.setRequestModeration(dto.getRequestModeration());
-        }
+        if (dto.getLocation() != null) event.setLocation(getLocation(dto.getLocation()));
+        if (dto.getParticipantLimit() != null) event.setParticipantLimit(dto.getParticipantLimit());
+        if (dto.getRequestModeration() != null) event.setRequestModeration(dto.getRequestModeration());
     }
 
     private void updateEventFromUserRequest(Event event, UpdateEventUserRequest dto) {
-        if (dto.getAnnotation() != null) {
-            event.setAnnotation(dto.getAnnotation());
-        }
-        if (dto.getDescription() != null) {
-            event.setDescription(dto.getDescription());
-        }
+        if (dto.getAnnotation() != null) event.setAnnotation(dto.getAnnotation());
+        if (dto.getDescription() != null) event.setDescription(dto.getDescription());
+
         if (dto.getEventDate() != null) {
             validateEventDate(dto.getEventDate(), 1);
             event.setEventDate(dto.getEventDate());
         }
-        if (dto.getPaid() != null) {
-            event.setPaid(dto.getPaid());
-        }
-        if (dto.getParticipantLimit() != null) {
-            event.setParticipantLimit(dto.getParticipantLimit());
-        }
-        if (dto.getRequestModeration() != null) {
-            event.setRequestModeration(dto.getRequestModeration());
-        }
-        if (dto.getTitle() != null) {
-            event.setTitle(dto.getTitle());
-        }
+
+        if (dto.getPaid() != null) event.setPaid(dto.getPaid());
+        if (dto.getParticipantLimit() != null) event.setParticipantLimit(dto.getParticipantLimit());
+        if (dto.getRequestModeration() != null) event.setRequestModeration(dto.getRequestModeration());
+        if (dto.getTitle() != null) event.setTitle(dto.getTitle());
 
         if (dto.getCategory() != null) {
             Category category = findCategoryById(dto.getCategory());
             event.setCategory(category);
         }
-        if (dto.getLocation() != null) {
-            event.setLocation(getLocation(dto.getLocation()));
-        }
+
+        if (dto.getLocation() != null) event.setLocation(getLocation(dto.getLocation()));
     }
 
     @Override
     @Transactional
     public EventFullDto updateEventByUser(Long userId, Long eventId, UpdateEventUserRequest updateRequest) {
-        Event event = findEventByIdAndInitiatorId(eventId, userId);
+        Event event = eventRepository.findByIdAndInitiator(eventId, userId)
+                .orElseThrow(() -> new NotFoundException("Событие с ID=" + eventId + " и инициатором ID=" + userId + " не найдено."));
 
         if (event.getState() == EventState.PUBLISHED) {
             throw new ConflictException("Нельзя изменить уже опубликованное событие.");
@@ -239,11 +212,9 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    public List<EventShortDto> getEventsByUser(String text, List<Long> categories, Boolean paid,
-                                               LocalDateTime rangeStart, LocalDateTime rangeEnd,
-                                               Boolean onlyAvailable, SortValue sort,
-                                               Integer from, Integer size, HttpServletRequest request) {
-
+    public List<EventShortDto> getEventsByUser(String text, List<Long> categories, Boolean paid, LocalDateTime rangeStart, LocalDateTime rangeEnd,
+            Boolean onlyAvailable, SortValue sort, Integer from, Integer size, HttpServletRequest request
+    ) {
         if (rangeStart != null && rangeEnd != null && rangeStart.isAfter(rangeEnd)) {
             throw new ValidationException("Дата начала не может быть позже даты окончания.");
         }
@@ -279,18 +250,12 @@ public class EventServiceImpl implements EventService {
 
         query.where(predicates.toArray(new Predicate[0]));
 
-        if (sort == SortValue.VIEWS) {
-            query.orderBy(cb.desc(eventRoot.get("views")));
-        } else {
-            query.orderBy(cb.desc(eventRoot.get("eventDate")));
-        }
+        if (sort == SortValue.EVENT_DATE) query.orderBy(cb.desc(eventRoot.get("eventDate")));
 
         List<Event> events = entityManager.createQuery(query)
                 .setFirstResult(from)
                 .setMaxResults(size)
                 .getResultList();
-
-        sendHitAsync(request.getRequestURI(), request.getRemoteAddr());
 
         List<EventShortDto> shortDtos = EventMapper.toEventShortDtoList(events);
 
@@ -305,24 +270,11 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
-    public EventFullDto getEvent(Long eventId, HttpServletRequest request) {
+    public EventFullDto getEvent(Long eventId, Long userId, HttpServletRequest request) {
         Event event = eventRepository.findByIdAndState(eventId, EventState.PUBLISHED)
                 .orElseThrow(() -> new NotFoundException("Опубликованное событие с ID=" + eventId + " не найдено."));
 
-        List<ViewStatsDto> stats = statsClient.getStats(
-                event.getPublishedOn() != null ? event.getPublishedOn() : event.getCreatedOn(),
-                LocalDateTime.now().plusSeconds(1),
-                List.of(request.getRequestURI()),
-                true
-        );
-
-        if (!stats.isEmpty()) {
-            event.setViews(stats.get(0).getHits());
-        } else {
-            event.setViews(0L);
-        }
-
-        sendHitAsync(request.getRequestURI(), request.getRemoteAddr());
+        collectorGrpcClient.collectUserActions(userId, eventId, ActionType.ACTION_VIEW);
 
         long confirmedRequests = participationRequestClient.countEventsInStatus(eventId, RequestStatus.CONFIRMED);
 
@@ -344,25 +296,15 @@ public class EventServiceImpl implements EventService {
 
         List<Predicate> predicates = new ArrayList<>();
 
-        if (users != null && !users.isEmpty()) {
-            predicates.add(eventRoot.get("initiator").in(users));
-        }
-
-        if (states != null && !states.isEmpty()) {
-            predicates.add(eventRoot.get("state").in(states));
-        }
+        if (users != null && !users.isEmpty()) predicates.add(eventRoot.get("initiator").in(users));
+        if (states != null && !states.isEmpty()) predicates.add(eventRoot.get("state").in(states));
 
         if (categories != null && !categories.isEmpty()) {
             predicates.add(eventRoot.get("category").get("id").in(categories));
         }
 
-        if (rangeStart != null) {
-            predicates.add(cb.greaterThanOrEqualTo(eventRoot.get("eventDate"), rangeStart));
-        }
-
-        if (rangeEnd != null) {
-            predicates.add(cb.lessThanOrEqualTo(eventRoot.get("eventDate"), rangeEnd));
-        }
+        if (rangeStart != null) predicates.add(cb.greaterThanOrEqualTo(eventRoot.get("eventDate"), rangeStart));
+        if (rangeEnd != null) predicates.add(cb.lessThanOrEqualTo(eventRoot.get("eventDate"), rangeEnd));
 
         query.where(predicates.toArray(new Predicate[0]));
 
@@ -377,70 +319,35 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    public List<EventShortDto> searchPublicEvents(String text, List<Long> categories, Boolean paid,
-                                                  LocalDateTime rangeStart, LocalDateTime rangeEnd,
-                                                  Boolean onlyAvailable, SortValue sort,
-                                                  Integer from, Integer size, HttpServletRequest request) {
+    public List<EventShortDto> getRecommendations(Long userId) {
+        List<RecommendedEventProto> recommendedEvents = analyzerGrpcClient
+                .getRecommendationsForUser(userId, 10)
+                .toList();
 
-        if (rangeStart != null && rangeEnd != null && rangeStart.isAfter(rangeEnd)) {
-            throw new ValidationException("Дата начала не может быть позже даты окончания.");
+        Map<Long, Double> scoreByEvent = recommendedEvents.stream()
+                .collect(Collectors.toMap(RecommendedEventProto::getEventId, RecommendedEventProto::getScore));
+
+        Set<Long> eventIds = recommendedEvents.stream()
+                .map(RecommendedEventProto::getEventId)
+                .collect(Collectors.toSet());
+
+        Set<Event> events = eventRepository.findAllByIdIn(eventIds);
+        Set<EventShortDto> shortEvents = EventMapper.toEventShortDtoSet(events);
+
+        shortEvents.forEach(eventShortDto -> eventShortDto.setRating(scoreByEvent.get(eventShortDto.getId())));
+
+        return shortEvents.stream().toList();
+    }
+
+    @Override
+    public void like(Long userId, Long eventId) {
+        if (!participationRequestClient.isUserParticipant(userId, eventId)) {
+            throw new ValidationException(String.format(
+                    "Пользователь с ID=%d не является участником события с ID=%d",
+                    userId, eventId)
+            );
         }
-
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Event> query = cb.createQuery(Event.class);
-        Root<Event> eventRoot = query.from(Event.class);
-
-        List<Predicate> predicates = new ArrayList<>();
-
-        if (text != null && !text.isBlank()) {
-            predicates.add(cb.or(
-                    cb.like(cb.lower(eventRoot.get("annotation")), "%" + text.toLowerCase() + "%"),
-                    cb.like(cb.lower(eventRoot.get("description")), "%" + text.toLowerCase() + "%")
-            ));
-        }
-
-        if (categories != null && !categories.isEmpty()) {
-            predicates.add(eventRoot.get("category").get("id").in(categories));
-        }
-
-        if (paid != null) {
-            predicates.add(cb.equal(eventRoot.get("paid"), paid));
-        }
-
-        LocalDateTime startDateTime = (rangeStart != null) ? rangeStart : LocalDateTime.now();
-        predicates.add(cb.greaterThan(eventRoot.get("eventDate"), startDateTime));
-        if (rangeEnd != null) {
-            predicates.add(cb.lessThan(eventRoot.get("eventDate"), rangeEnd));
-        }
-
-        predicates.add(cb.equal(eventRoot.get("state"), EventState.PUBLISHED));
-
-        query.where(predicates.toArray(new Predicate[0]));
-
-        if (sort == SortValue.VIEWS) {
-            query.orderBy(cb.desc(eventRoot.get("views")));
-        } else {
-            query.orderBy(cb.desc(eventRoot.get("eventDate")));
-        }
-
-        List<Event> events = entityManager.createQuery(query)
-                .setFirstResult(from)
-                .setMaxResults(size)
-                .getResultList();
-
-        sendHitAsync(request.getRequestURI(), request.getRemoteAddr());
-
-        List<EventShortDto> shortDtos = EventMapper.toEventShortDtoList(events);
-
-        if (onlyAvailable != null && onlyAvailable) {
-            return shortDtos.stream()
-                    .filter(dto -> {
-                        return dto.getParticipantLimit() == 0 || dto.getConfirmedRequests() < dto.getParticipantLimit();
-                    })
-                    .collect(Collectors.toList());
-        }
-
-        return shortDtos;
+        collectorGrpcClient.collectUserActions(userId, eventId, ActionType.ACTION_LIKE);
     }
 
     private void validateEventDate(LocalDateTime eventDate, int hours) {
@@ -449,71 +356,9 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void incrementEventViews(Long eventId) {
-        eventRepository.incrementViews(eventId);
-    }
-
-    private List<Event> findEventsWithPredicates(List<Predicate> predicates, SortValue sort, int from, int size) {
-        CriteriaBuilder builder = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Event> query = builder.createQuery(Event.class);
-        Root<Event> root = query.from(Event.class);
-
-        root.fetch("initiator", JoinType.LEFT);
-        root.fetch("category", JoinType.LEFT);
-
-        query.where(predicates.toArray(new Predicate[0]));
-
-        if (sort != null) {
-            if (sort == SortValue.VIEWS) {
-                query.orderBy(builder.desc(root.get("views")));
-            } else {
-                query.orderBy(builder.asc(root.get("eventDate")));
-            }
-        }
-
-        return entityManager.createQuery(query)
-                .setFirstResult(from)
-                .setMaxResults(size)
-                .getResultList();
-    }
-
     private Location getLocation(LocationDto locationDto) {
         return locationRepository.findByLatAndLon(locationDto.getLat(), locationDto.getLon())
                 .orElseGet(() -> locationRepository.save(LocationMapper.toLocation(locationDto)));
-    }
-
-    private List<Predicate> buildAdminSearchPredicates(List<Long> users, List<EventState> states, List<Long> categories,
-                                                       LocalDateTime rangeStart, LocalDateTime rangeEnd) {
-        CriteriaBuilder builder = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Event> query = builder.createQuery(Event.class);
-        Root<Event> root = query.from(Event.class);
-        List<Predicate> predicates = new ArrayList<>();
-
-        if (users != null && !users.isEmpty()) {
-            predicates.add(root.get("initiator").in(users));
-        }
-        if (states != null && !states.isEmpty()) {
-            predicates.add(root.get("state").in(states));
-        }
-        if (categories != null && !categories.isEmpty()) {
-            predicates.add(root.get("category").get("id").in(categories));
-        }
-        if (rangeStart != null) {
-            predicates.add(builder.greaterThanOrEqualTo(root.get("eventDate"), rangeStart));
-        }
-        if (rangeEnd != null) {
-            predicates.add(builder.lessThanOrEqualTo(root.get("eventDate"), rangeEnd));
-        }
-
-        return predicates;
-    }
-
-    @Async
-    public void sendHitAsync(String uri, String ip) {
-        HitDto hitDto = new HitDto(null, appName, uri, ip, LocalDateTime.now());
-        statsClient.saveHit(hitDto);
     }
 
     private Event findEventByIdAndInitiatorId(Long eventId, Long userId) {
@@ -521,50 +366,6 @@ public class EventServiceImpl implements EventService {
                 .orElseThrow(() -> new NotFoundException(
                         String.format("Событие с ID=%d и инициатором ID=%d не найдено.", eventId, userId)
                 ));
-    }
-
-    private List<Predicate> buildPublicSearchPredicates(String text, List<Long> categories, Boolean paid,
-                                                        LocalDateTime rangeStart, LocalDateTime rangeEnd, Boolean onlyAvailable) {
-        CriteriaBuilder builder = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Event> query = builder.createQuery(Event.class);
-        Root<Event> root = query.from(Event.class);
-        List<Predicate> predicates = new ArrayList<>();
-
-        predicates.add(builder.equal(root.get("state"), EventState.PUBLISHED));
-
-        if (text != null && !text.isBlank()) {
-            String searchText = "%" + text.toLowerCase() + "%";
-            predicates.add(builder.or(
-                    builder.like(builder.lower(root.get("annotation")), searchText),
-                    builder.like(builder.lower(root.get("description")), searchText)
-            ));
-        }
-        if (categories != null && !categories.isEmpty()) {
-            predicates.add(root.get("category").get("id").in(categories));
-        }
-        if (paid != null) {
-            predicates.add(builder.equal(root.get("paid"), paid));
-        }
-
-        if (rangeStart == null && rangeEnd == null) {
-            predicates.add(builder.greaterThanOrEqualTo(root.get("eventDate"), LocalDateTime.now()));
-        } else {
-            if (rangeStart != null) {
-                predicates.add(builder.greaterThanOrEqualTo(root.get("eventDate"), rangeStart));
-            }
-            if (rangeEnd != null) {
-                predicates.add(builder.lessThanOrEqualTo(root.get("eventDate"), rangeEnd));
-            }
-        }
-
-        if (onlyAvailable != null && onlyAvailable) {
-            predicates.add(builder.or(
-                    builder.equal(root.get("participantLimit"), 0),
-                    builder.lessThan(root.get("confirmedRequests"), root.get("participantLimit"))
-            ));
-        }
-
-        return predicates;
     }
 
     private Optional<UserDto> findUserById(Long userId) {

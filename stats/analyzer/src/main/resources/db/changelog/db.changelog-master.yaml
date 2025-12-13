@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-tables
+      author: belov
+      changes:
+        - sqlFile:
+            path: changes/001-create-tables.sql
+            relativeToChangelogFile: true
+            stripComments: true
+            splitStatements: false

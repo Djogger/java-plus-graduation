@@ -38,7 +38,6 @@ public final class EventMapper {
                 .state(EventState.PENDING)
                 .createdOn(LocalDateTime.now())
                 .publishedOn(null)
-                .views(0L)
                 .confirmedRequests(0L)
                 .build();
     }
@@ -54,7 +53,7 @@ public final class EventMapper {
                 event.getInitiator(),
                 event.getPaid(),
                 event.getTitle(),
-                event.getViews(),
+                event.getRating(),
                 event.getConfirmedRequests(),
                 event.getParticipantLimit()
         );
@@ -95,7 +94,7 @@ public final class EventMapper {
                 event.getRequestModeration(),
                 event.getState(),
                 event.getTitle(),
-                event.getViews()
+                event.getRating()
         );
     }
 

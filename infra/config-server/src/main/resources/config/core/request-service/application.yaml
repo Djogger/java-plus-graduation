@@ -27,6 +27,16 @@ spring:
 server:
   port: 0
 
+grpc:
+  server:
+    port: 0
+  client:
+    collector:
+      address: 'discovery:///collector'
+      keepAliveWithoutCalls: true
+      negotiationType: plaintext
+      enableKeepAlive: true
+
 logging:
   level:
     org.springframework.orm.jpa: INFO

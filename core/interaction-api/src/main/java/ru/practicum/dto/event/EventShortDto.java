@@ -24,7 +24,7 @@ public class EventShortDto {
     private Long initiator;
     private Boolean paid;
     private String title;
-    private Long views;
+    private Double rating;
     private Long confirmedRequests;
     private Long participantLimit;
 }
