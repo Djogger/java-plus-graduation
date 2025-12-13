@@ -17,8 +17,10 @@ public interface StatsClient {
     String saveHit(@RequestBody HitDto hitDto) throws FeignException;
 
     @GetMapping("/stats")
-    List<ViewStatsDto> getStats(@RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime start,
-                                @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime end,
-                                @RequestParam(required = false) List<String> uris,
-                                @RequestParam(required = false) Boolean unique);
+    List<ViewStatsDto> getStats(
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime start,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime end,
+            @RequestParam(required = false) List<String> uris,
+            @RequestParam(required = false) Boolean unique
+    );
 }

@@ -20,9 +20,9 @@ public class ErrorHandler {
         logError(e);
         HttpStatus status = HttpStatus.BAD_REQUEST;
         return ErrorResponse.builder(status.value(), status.getReasonPhrase())
-                        .message(e.getMessage())
-                        .stackTrace(getStackTrace(e))
-                        .build();
+                .message(e.getMessage())
+                .stackTrace(getStackTrace(e))
+                .build();
     }
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -38,10 +38,12 @@ public class ErrorHandler {
 
     private void logError(Exception e) {
         String template = """
-            \n================================================= ERROR ==================================================
-            Message: {}
-            Exception type: {}
-            """;
+                ERROR:
+                ------
+                Message: {}
+                Exception type: {}
+                ------
+                """;
 
         log.error(template, e.getMessage(), e.getClass().getName(), e);
     }

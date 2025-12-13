@@ -6,9 +6,6 @@ import ru.practicum.model.Hit;
 import java.time.LocalDateTime;
 
 public class HitMapper {
-    /**
-     * Don't let anyone instantiate this class.
-     */
     private HitMapper() {
 
     }

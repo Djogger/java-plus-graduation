@@ -14,10 +14,10 @@ CREATE TABLE IF NOT EXISTS hits
 
 -- Индексы:
 -- поиск по приложениям и датам
-CREATE INDEX IF NOT EXISTS idx_hits_app_created ON hits(app, created);
+CREATE INDEX IF NOT EXISTS idx_hits_app_created ON hits (app, created);
 
 -- поиск по IP адресам
-CREATE INDEX IF NOT EXISTS idx_hits_ip ON hits(ip);
+CREATE INDEX IF NOT EXISTS idx_hits_ip ON hits (ip);
 
 -- поиск по URI
-CREATE INDEX IF NOT EXISTS idx_hits_uri ON hits(uri);
+CREATE INDEX IF NOT EXISTS idx_hits_uri ON hits (uri);

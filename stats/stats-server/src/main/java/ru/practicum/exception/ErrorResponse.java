@@ -24,11 +24,9 @@ public class ErrorResponse {
         this.validationErrors = builder.validationErrors;
     }
 
-
     public static Builder builder(int status, String error) {
         return new Builder(status, error);
     }
-
 
     public static class Builder {
         private final int status;
