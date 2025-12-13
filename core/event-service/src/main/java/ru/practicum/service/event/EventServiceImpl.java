@@ -164,8 +164,7 @@ public class EventServiceImpl implements EventService {
     @Override
     @Transactional
     public EventFullDto updateEventByUser(Long userId, Long eventId, UpdateEventUserRequest updateRequest) {
-        Event event = eventRepository.findByIdAndInitiator(eventId, userId)
-                .orElseThrow(() -> new NotFoundException("Событие с ID=" + eventId + " и инициатором ID=" + userId + " не найдено."));
+        Event event = findEventByIdAndInitiatorId(eventId, userId);
 
         if (event.getState() == EventState.PUBLISHED) {
             throw new ConflictException("Нельзя изменить уже опубликованное событие.");
