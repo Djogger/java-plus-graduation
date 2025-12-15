@@ -15,6 +15,8 @@ import ru.practicum.enums.EventState;
 import ru.practicum.enums.RequestStatus;
 import ru.practicum.exception.ConflictException;
 import ru.practicum.exception.NotFoundException;
+import ru.practicum.ActionType;
+import ru.practicum.CollectorGrpcClient;
 import ru.practicum.mapper.ParticipationRequestMapper;
 import ru.practicum.model.ParticipationRequest;
 import ru.practicum.repository.ParticipationRequestRepository;
@@ -29,6 +31,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ParticipationRequestServiceImpl implements ParticipationRequestService {
     private final ParticipationRequestRepository requestRepository;
+    private final CollectorGrpcClient collectorGrpcClient;
     private final UserClient userClient;
     private final EventClient eventClient;
 
@@ -72,6 +75,8 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
 
         ParticipationRequest savedRequest = requestRepository.save(request);
         log.info("Успешно создан запрос id={} со статусом {}", savedRequest.getId(), savedRequest.getStatus());
+
+        collectorGrpcClient.collectUserActions(userId, eventId, ActionType.ACTION_REGISTER);
 
         return ParticipationRequestMapper.toParticipationRequestDto(savedRequest);
     }
@@ -224,6 +229,11 @@ public class ParticipationRequestServiceImpl implements ParticipationRequestServ
     @Override
     public Map<Long, Long> countConfirmedRequestsForEvents(Set<Long> eventIds) {
         return requestRepository.countConfirmedRequestsForEvents(eventIds);
+    }
+
+    @Override
+    public boolean isUserParticipant(Long userId, Long eventId) {
+        return requestRepository.isUserParticipant(userId, eventId);
     }
 
     private Optional<UserDto> findUserById(Long userId) {

@@ -33,6 +33,16 @@ public interface ParticipationRequestRepository extends JpaRepository<Participat
             """)
     List<Object[]> countConfirmedRequestsForEventsRaw(@Param("eventIds") Set<Long> eventIds);
 
+    @Query("""
+            SELECT
+            CASE WHEN COUNT(r) > 0 THEN TRUE ELSE FALSE END 
+            FROM ParticipationRequest r 
+            WHERE r.requester = :requesterId 
+            AND r.event = :eventId 
+            AND r.status = 'CONFIRMED'
+            """)
+    boolean isUserParticipant(Long requesterId, Long eventId);
+
     default Map<Long, Long> countConfirmedRequestsForEvents(Set<Long> eventIds) {
         if (Objects.isNull(eventIds) || eventIds.isEmpty()) return Collections.emptyMap();
         return countConfirmedRequestsForEventsRaw(eventIds).stream()

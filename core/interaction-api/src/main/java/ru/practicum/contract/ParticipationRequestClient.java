@@ -28,4 +28,8 @@ public interface ParticipationRequestClient {
             @PathVariable Long eventId,
             @RequestBody EventRequestStatusUpdateRequest requestStatusUpdateDto
     );
+
+    @PostMapping("{eventId}/participant/{userId}")
+    boolean isUserParticipant(@PathVariable Long userId, @PathVariable Long eventId);
+
 }

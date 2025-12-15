@@ -8,7 +8,6 @@ import ru.practicum.contract.UserClient;
 
 @SpringBootApplication
 @EnableFeignClients(clients = {
-        StatsClient.class,
         UserClient.class,
         ParticipationRequestClient.class
 })
